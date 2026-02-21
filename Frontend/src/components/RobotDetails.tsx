@@ -1,12 +1,34 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import type { Robot } from '../types'
+import { useMqtt } from '../hooks/useMqtt'
+import { useWebRTC } from '../hooks/useWebRTC'
+
+const HOME_LAT = 42.3570
+const HOME_LNG = -71.0920
 
 interface RobotDetailsProps {
   robot: Robot
 }
 
 const RobotDetails = ({ robot }: RobotDetailsProps) => {
-  const { name, minutesAway, batteryPercentage, trashCapacity, recycleCapacity, lat, lng } = robot
+  const { name, minutesAway } = robot
+
+  // Live telemetry over MQTT — falls back to static robot data until connected
+  const { telemetry, connected } = useMqtt(robot.id, {
+    trashCapacity: robot.trashCapacity,
+    recycleCapacity: robot.recycleCapacity,
+    batteryPercentage: robot.batteryPercentage,
+    lat: robot.lat,
+    lng: robot.lng,
+  })
+
+  const { trashCapacity, recycleCapacity, batteryPercentage, lat, lng } = telemetry
+
+  // Live video over WebRTC
+  const { videoRef, error: videoError } = useWebRTC(robot.id)
+
+  const midLat = (lat + HOME_LAT) / 2
+  const midLng = (lng + HOME_LNG) / 2
 
   return (
     <div
@@ -20,15 +42,28 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
         gap: '16px',
         color: '#111729',
         width: '100%',
-        height: '100%'
+        height: '100%',
+        overflowY: 'auto',
       }}
     >
       {/* Header */}
-      <div>
-        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#111729' }}>{name}</h2>
-        <p style={{ margin: 0, fontSize: '14px', color: '#9BA1B0', marginTop: '4px' }}>
-          <span style={{ fontWeight: 600 }}>{minutesAway}</span> minutes away
-        </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#111729' }}>{name}</h2>
+          <p style={{ margin: 0, fontSize: '14px', color: '#9BA1B0', marginTop: '4px' }}>
+            <span style={{ fontWeight: 600 }}>{minutesAway}</span> minutes away
+          </p>
+        </div>
+        <span style={{
+          fontSize: '11px',
+          fontWeight: 600,
+          padding: '4px 10px',
+          borderRadius: '999px',
+          backgroundColor: connected ? '#D1FAE5' : '#F3F4F6',
+          color: connected ? '#065F46' : '#9BA1B0',
+        }}>
+          {connected ? 'Live' : 'Offline'}
+        </span>
       </div>
 
       {/* Live Video Feed */}
@@ -37,23 +72,38 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
         borderRadius: '12px',
         width: '100%',
         aspectRatio: '16 / 9',
+        overflow: 'hidden',
+        flexShrink: 0,
+        position: 'relative',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: '#9BA1B0',
-        fontSize: '13px',
-        flexShrink: 0,
       }}>
-        Something went wrong...
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: videoError ? 'none' : 'block' }}
+        />
+        {videoError && (
+          <span style={{ color: '#9BA1B0', fontSize: '13px' }}>
+            Video unavailable — waiting for WebRTC connection
+          </span>
+        )}
       </div>
 
       {/* Map */}
       <div style={{ borderRadius: '12px', overflow: 'hidden', height: '200px', flexShrink: 0 }}>
-        <MapContainer center={[lat, lng]} zoom={15} style={{ height: '100%', width: '100%' }} key={`${lat}-${lng}`} zoomControl={false}>
+        <MapContainer center={[midLat, midLng]} zoom={14} style={{ height: '100%', width: '100%' }} key={`${lat}-${lng}`} zoomControl={false}>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <Marker position={[lat, lng]}>
             <Popup>{name}</Popup>
           </Marker>
+          <Marker position={[HOME_LAT, HOME_LNG]}>
+            <Popup>You</Popup>
+          </Marker>
+          <Polyline positions={[[lat, lng], [HOME_LAT, HOME_LNG]]} color="#597FF5" weight={3} />
         </MapContainer>
       </div>
 
