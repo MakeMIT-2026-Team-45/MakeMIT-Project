@@ -280,8 +280,25 @@ def main() -> None:
         for p in model.backbone.parameters():
             p.requires_grad = False
 
+    # Weight classes inversely proportional to their frequency in the train split.
+    train_counts = torch.zeros(2, dtype=torch.float32)
+    for sample in train_samples:
+        train_counts[sample.binary_label] += 1.0
+    if (train_counts == 0).any():
+        raise RuntimeError(
+            f"Cannot compute class weights because at least one class is missing: {train_counts.tolist()}"
+        )
+    class_weights = 1.0 / train_counts
+    class_weights = class_weights / class_weights.sum() * 2.0
+    class_weights = class_weights.to(device)
+    print(
+        "train class counts and loss weights: "
+        f"trash={int(train_counts[0].item())}, recycling={int(train_counts[1].item())}, "
+        f"weights={class_weights.detach().cpu().tolist()}"
+    )
+
     optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
 
     best_acc = 0.0
     args.output_dir.mkdir(parents=True, exist_ok=True)

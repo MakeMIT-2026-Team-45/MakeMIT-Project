@@ -1,19 +1,40 @@
 import io
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from huggingface_hub import hf_hub_download
 from PIL import Image
 import torch
-from ultralytics import YOLO
+from torchvision import transforms
+
+from train_taco_mobilenet_binary import MobileNetBinaryHead
 
 app = FastAPI()
 
-device = "mps" if torch.backends.mps.is_available() else "cpu"
-weights_path = hf_hub_download(
-    repo_id="kendrickfff/waste-classification-yolov8-ken",
-    filename="yolov8n-waste-12cls-best.pt",
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+elif torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
+
+checkpoint_path = Path(__file__).with_name("checkpoints") / "mobilenetv3_taco_binary_best.pt"
+if not checkpoint_path.exists():
+    raise FileNotFoundError(
+        f"Trained checkpoint not found: {checkpoint_path}. Run training first."
+    )
+
+checkpoint = torch.load(checkpoint_path, map_location=device)
+model = MobileNetBinaryHead().to(device)
+model.load_state_dict(checkpoint["state_dict"])
+model.eval()
+
+eval_transform = transforms.Compose(
+    [
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
 )
-model = YOLO(weights_path).to(device)
 
 @app.get("/")
 async def root():
@@ -36,30 +57,21 @@ async def torch_test_video(request: Request):
         raise HTTPException(status_code=400, detail="Body is not a valid JPEG binary payload")
 
     image = Image.open(io.BytesIO(raw)).convert("RGB")
-    result = model(image, verbose=False)[0]
+    x = eval_transform(image).unsqueeze(0).to(device)
 
-    names = result.names if isinstance(result.names, dict) else {}
-    num_classes = len(names)
-    if num_classes == 0:
-        raise HTTPException(status_code=500, detail="Model did not provide class names")
+    with torch.no_grad():
+        logits = model(x)
+        probs = torch.softmax(logits, dim=1)
+        top_prob, top_idx = torch.max(probs, dim=1)
 
-    # This HF checkpoint is object detection. Convert detections into class scores
-    # by taking max confidence per class.
-    class_scores = torch.zeros(num_classes, dtype=torch.float32)
-    if result.boxes is not None and len(result.boxes) > 0:
-        cls_ids = result.boxes.cls.tolist()
-        confs = result.boxes.conf.tolist()
-        for cls_id, conf in zip(cls_ids, confs):
-            idx = int(cls_id)
-            class_scores[idx] = max(class_scores[idx], float(conf))
-
-    top_idx = int(torch.argmax(class_scores).item())
-    top_prob = float(class_scores[top_idx].item())
-    most_likely_class = names.get(top_idx, str(top_idx)) if top_prob > 0 else None
+    # Binary mapping from training:
+    # 0 -> trash, 1 -> recycling
+    prediction = int(top_idx.item())
+    max_probability = float(top_prob.item())
 
     return {
         "content_type": content_type,
         "size_bytes": len(raw),
-        "most_likely_class": most_likely_class,
-        "most_likely_probability": top_prob,
+        "prediction": prediction,
+        "max_probability": max_probability,
     }
