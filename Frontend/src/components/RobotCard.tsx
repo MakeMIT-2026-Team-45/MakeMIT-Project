@@ -35,7 +35,7 @@ const RobotCard = ({
           {name}
         </h2>
         <p style={{ margin: 0, fontSize: '14px', color: '#9BA1B0', marginTop: '4px' }}>
-          <span style={{ fontWeight: 600, color: '#9BA1B0' }}>{minutesAway}</span> minutes away
+          <span style={{ fontWeight: 600, color: '#9BA1B0' }}>{minutesAway}</span> {minutesAway == 1 ? ("minute") : ("minutes")} away
         </p>
       </div>
 
