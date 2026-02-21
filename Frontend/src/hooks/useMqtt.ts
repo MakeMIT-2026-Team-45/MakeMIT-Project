@@ -18,6 +18,7 @@ export function useMqtt(robotId: number, fallback: Telemetry) {
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
+    setTelemetry(fallback)
     const client = mqtt.connect(BROKER_URL)
 
     client.on('connect', () => {

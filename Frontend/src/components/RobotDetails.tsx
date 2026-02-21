@@ -1,4 +1,5 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { useEffect } from 'react'
 import type { Robot } from '../types'
 import { useMqtt } from '../hooks/useMqtt'
 import { useWebRTC } from '../hooks/useWebRTC'
@@ -6,6 +7,14 @@ import { useWebRTC } from '../hooks/useWebRTC'
 
 interface RobotDetailsProps {
   robot: Robot
+}
+
+const MapRecenter = ({ lat, lng }: { lat: number; lng: number }) => {
+  const map = useMap()
+  useEffect(() => {
+    map.setView([lat, lng])
+  }, [lat, lng, map])
+  return null
 }
 
 const RobotDetails = ({ robot }: RobotDetailsProps) => {
@@ -90,8 +99,9 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
 
       {/* Map */}
       <div style={{ borderRadius: '12px', overflow: 'hidden', height: '200px', flexShrink: 0 }}>
-        <MapContainer center={[lat, lng]} zoom={14} style={{ height: '100%', width: '100%' }} key={`${lat}-${lng}`} zoomControl={false}>
+        <MapContainer center={[lat, lng]} zoom={18} style={{ height: '100%', width: '100%' }} key={robot.id} zoomControl={false}>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapRecenter lat={lat} lng={lng} />
           <Marker position={[lat, lng]}>
             <Popup>{name}</Popup>
           </Marker>
