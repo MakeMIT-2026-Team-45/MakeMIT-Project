@@ -1,10 +1,8 @@
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import type { Robot } from '../types'
 import { useMqtt } from '../hooks/useMqtt'
 import { useWebRTC } from '../hooks/useWebRTC'
 
-const HOME_LAT = 42.3570
-const HOME_LNG = -71.0920
 
 interface RobotDetailsProps {
   robot: Robot
@@ -26,9 +24,6 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
 
   // Live video over WebRTC
   const { videoRef, error: videoError } = useWebRTC(robot.id)
-
-  const midLat = (lat + HOME_LAT) / 2
-  const midLng = (lng + HOME_LNG) / 2
 
   return (
     <div
@@ -95,15 +90,11 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
 
       {/* Map */}
       <div style={{ borderRadius: '12px', overflow: 'hidden', height: '200px', flexShrink: 0 }}>
-        <MapContainer center={[midLat, midLng]} zoom={14} style={{ height: '100%', width: '100%' }} key={`${lat}-${lng}`} zoomControl={false}>
+        <MapContainer center={[lat, lng]} zoom={14} style={{ height: '100%', width: '100%' }} key={`${lat}-${lng}`} zoomControl={false}>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <Marker position={[lat, lng]}>
             <Popup>{name}</Popup>
           </Marker>
-          <Marker position={[HOME_LAT, HOME_LNG]}>
-            <Popup>You</Popup>
-          </Marker>
-          <Polyline positions={[[lat, lng], [HOME_LAT, HOME_LNG]]} color="#597FF5" weight={3} />
         </MapContainer>
       </div>
 
