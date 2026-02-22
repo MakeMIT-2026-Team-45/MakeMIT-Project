@@ -5,9 +5,9 @@ echo "[start.sh] Starting Mosquitto..."
 mosquitto -c /etc/mosquitto/mosquitto.conf > /tmp/mosquitto.log 2>&1 &
 MOSQ_PID=$!
 
-echo "[start.sh] Waiting for Mosquitto on port 1883..."
+echo "[start.sh] Waiting for Mosquitto on port 1884..."
 for i in $(seq 1 20); do
-    if (echo > /dev/tcp/localhost/1883) 2>/dev/null; then
+    if (echo > /dev/tcp/localhost/1884) 2>/dev/null; then
         echo "[start.sh] Mosquitto ready."
         break
     fi
