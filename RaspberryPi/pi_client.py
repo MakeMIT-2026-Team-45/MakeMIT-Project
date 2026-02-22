@@ -179,7 +179,7 @@ def run(config: PiClientConfig) -> None:
                     stream_url,
                     data=frame,
                     headers={"Content-Type": "image/jpeg"},
-                    timeout=frame_interval,  # don't stall longer than one frame period
+                    timeout=(2, 2),  # (connect_timeout, read_timeout) in seconds
                 )
             except Exception as exc:
                 print(f"[stream] {exc}")
