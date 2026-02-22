@@ -23,10 +23,10 @@ from PIL import Image
 #   max_dc  (2.5%) → 180° (arm fully up, unused)
 # We map only the 0–45° working range within that reversed scale.
 #
-# BCM GPIO pin: 18  (physical pin 12, hardware PWM channel 0)
+# BCM GPIO pin: 12  (physical pin 32, hardware PWM channel 0)
 # Servo signal wired to this pin; VCC → external 5V; GND → common GND.
 
-PICKUP_SERVO_PIN   = 18
+PICKUP_SERVO_PIN   = 12
 PICKUP_FREQ_HZ     = 50.0
 PICKUP_MIN_DC      = 12.5   # duty cycle at 0°  (arm down)
 PICKUP_MAX_DC      = 2.5    # duty cycle at 180° (arm fully up)
