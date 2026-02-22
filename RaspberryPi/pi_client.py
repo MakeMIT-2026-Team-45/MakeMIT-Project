@@ -193,7 +193,7 @@ def run(config: PiClientConfig) -> None:
             if frame_count % config.ai_every_n_frames == 0:
                 threading.Thread(
                     target=_run_ai_inference,
-                    args=(config.endpoint, frame, frame_count),
+                    args=(f"{base_url}/torch-test-video", frame, frame_count),
                     daemon=True,
                 ).start()
 
