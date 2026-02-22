@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 
 @dataclass
@@ -123,54 +123,13 @@ def _base_url(endpoint: str) -> str:
     return f"{p.scheme}://{p.netloc}"
 
 
-# Shared annotation state updated by AI thread, read by video loop
-_last_label: str = ""
-_last_prob: float = 0.0
-_annotation_lock = threading.Lock()
-
-
-def _annotate_frame(frame: bytes) -> bytes:
-    """Draw a centered bounding box and label on the JPEG frame."""
-    with _annotation_lock:
-        label = _last_label
-        prob = _last_prob
-    if not label:
-        return frame
-
-    img = Image.open(io.BytesIO(frame)).convert("RGB")
-    w, h = img.size
-    draw = ImageDraw.Draw(img)
-
-    # Centered box covering middle 60% of frame
-    bx0, by0 = int(w * 0.2), int(h * 0.2)
-    bx1, by1 = int(w * 0.8), int(h * 0.8)
-    color = "#00C853" if label == "recycling" else "#FF3D00"
-    draw.rectangle([bx0, by0, bx1, by1], outline=color, width=3)
-
-    text = f"{label.upper()}  {prob * 100:.0f}%"
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-    except Exception:
-        font = ImageFont.load_default()
-    draw.rectangle([bx0, by0 - 28, bx0 + len(text) * 13, by0], fill=color)
-    draw.text((bx0 + 4, by0 - 26), text, fill="white", font=font)
-
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=80)
-    return buf.getvalue()
-
-
 def _run_ai_inference(endpoint: str, frame: bytes, frame_count: int) -> None:
     """Runs in a background thread so it never blocks the video loop."""
-    global _last_label, _last_prob
     try:
         result = post_jpeg(endpoint, frame)
         cls = result.get("prediction")
         prob = result.get("max_probability")
         label = "recycling" if cls == 1 else "trash"
-        with _annotation_lock:
-            _last_label = label
-            _last_prob = prob
         print(f"[frame {frame_count}] {label} ({prob:.1%}) bytes={len(frame)}")
     except requests.HTTPError as exc:
         print(f"[AI] HTTP error {exc.response.status_code}: {exc.response.text}")
@@ -216,13 +175,12 @@ def run(config: PiClientConfig) -> None:
                 break
 
             frame_count += 1
-            annotated = _annotate_frame(frame)
 
             # Push every frame to the MJPEG stream (non-blocking best-effort)
             try:
                 session.post(
                     stream_url,
-                    data=annotated,
+                    data=frame,
                     headers={"Content-Type": "image/jpeg"},
                     timeout=(2, 2),  # (connect_timeout, read_timeout) in seconds
                 )
@@ -235,7 +193,7 @@ def run(config: PiClientConfig) -> None:
             if frame_count % config.ai_every_n_frames == 0:
                 threading.Thread(
                     target=_run_ai_inference,
-                    args=(f"{base_url}/torch-test-video", frame, frame_count),
+                    args=(f"{base_url}/torch-test-video?robot_id={config.robot_id}", frame, frame_count),
                     daemon=True,
                 ).start()
 

@@ -33,6 +33,9 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
   const [videoLive, setVideoLive] = useState(false)
   const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Latest AI classification result
+  const [aiResult, setAiResult] = useState<{ label: string; confidence: number } | null>(null)
+
   const handleVideoFrame = () => {
     setVideoLive(true)
     if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current)
@@ -40,8 +43,7 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
   }
 
   useEffect(() => {
-    // Poll backend every 3s — if the stream endpoint has a live frame stored, it returns 200 immediately
-    const check = async () => {
+    const checkVideo = async () => {
       try {
         const res = await fetch(`https://mit.ethanzhao.us/video-frame-check/${robot.id}`)
         if (res.ok) handleVideoFrame()
@@ -50,10 +52,19 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
         setVideoLive(false)
       }
     }
-    check()
-    const interval = setInterval(check, 3000)
+    const checkAI = async () => {
+      try {
+        const res = await fetch(`https://mit.ethanzhao.us/ai-result/${robot.id}`)
+        if (res.ok) setAiResult(await res.json())
+      } catch { /* ignore */ }
+    }
+    checkVideo()
+    checkAI()
+    const videoInterval = setInterval(checkVideo, 3000)
+    const aiInterval = setInterval(checkAI, 2000)
     return () => {
-      clearInterval(interval)
+      clearInterval(videoInterval)
+      clearInterval(aiInterval)
       if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current)
     }
   }, [robot.id])
@@ -106,6 +117,10 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        border: aiResult
+          ? `3px solid ${aiResult.label === 'recycling' ? '#00C853' : '#FF3D00'}`
+          : '3px solid transparent',
+        boxSizing: 'border-box',
       }}>
         <img
           src={`https://mit.ethanzhao.us/video-feed/${robot.id}?t=${Date.now()}`}
@@ -120,6 +135,21 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
           }}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
+        {aiResult && videoLive && (
+          <div style={{
+            position: 'absolute',
+            bottom: 10,
+            left: 10,
+            backgroundColor: aiResult.label === 'recycling' ? '#00C853' : '#FF3D00',
+            color: 'white',
+            fontSize: '13px',
+            fontWeight: 700,
+            padding: '4px 10px',
+            borderRadius: '6px',
+          }}>
+            {aiResult.label.toUpperCase()} — {aiResult.confidence}%
+          </div>
+        )}
         {!videoLive && (
           <div style={{
             position: 'absolute',
