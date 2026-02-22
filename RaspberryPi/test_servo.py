@@ -1,11 +1,11 @@
 """
 test_servo.py — Standalone servo wiring test.
 
-Sweeps the servo through 0° → 90° → 180° → 90° → 0° so you can visually
+Sweeps the servo through 0° → 100° → 200° → 100° → 0° so you can visually
 confirm the servo is wired correctly before running the full drive_client.
 
 Direction is reversed (min_dc=12.5, max_dc=2.5) so 0° physically moves CW
-and 180° moves CCW, opposite of the standard SG90 convention.
+and 200° moves CCW, opposite of the standard SG90 convention.
 
 Wiring (SG90 / MG996R):
   Signal → Pin 32 (BCM GPIO 12, hardware PWM channel 0)
@@ -14,7 +14,7 @@ Wiring (SG90 / MG996R):
 
 Usage:
   python3 test_servo.py
-  python3 test_servo.py --pin 18 --angles 0 45 90 135 180
+  python3 test_servo.py --pin 18 --angles 0 50 100 150 200
 """
 
 import argparse
@@ -24,9 +24,9 @@ import RPi.GPIO as GPIO  # type: ignore
 
 
 def set_angle(pwm: GPIO.PWM, angle: float, min_dc: float = 2.5, max_dc: float = 12.5) -> None:
-    """Set servo to angle_deg [0, 180] and hold for settle time."""
-    angle = max(0.0, min(180.0, angle))
-    dc = min_dc + (angle / 180.0) * (max_dc - min_dc)
+    """Set servo to angle_deg [0, 200] and hold for settle time."""
+    angle = max(0.0, min(200.0, angle))
+    dc = min_dc + (angle / 200.0) * (max_dc - min_dc)
     pwm.ChangeDutyCycle(dc)
 
 
@@ -39,15 +39,15 @@ def main() -> None:
     parser.add_argument("--min-dc", type=float, default=12.5,
                         help="Duty cycle for 0° (reversed: 12.5%% = CW start).")
     parser.add_argument("--max-dc", type=float, default=2.5,
-                        help="Duty cycle for 180° (reversed: 2.5%% = CCW end).")
+                        help="Duty cycle for 200° (reversed: 2.5%% = CCW end).")
     parser.add_argument("--settle", type=float, default=0.6,
                         help="Seconds to wait after each move (default: 0.6).")
-    parser.add_argument("--angles", type=float, nargs="+", default=[0, 90, 180, 90, 0],
-                        help="Sequence of angles to sweep (default: 0 90 180 90 0).")
+    parser.add_argument("--angles", type=float, nargs="+", default=[0, 100, 200, 100, 0],
+                        help="Sequence of angles to sweep (default: 0 100 200 100 0).")
     args = parser.parse_args()
 
     print(f"Servo test  BCM GPIO {args.pin}  (physical pin {'32' if args.pin == 12 else '?'})")
-    print(f"Frequency   {args.freq} Hz   duty cycle {args.min_dc}%% (0°) – {args.max_dc}%% (180°)")
+    print(f"Frequency   {args.freq} Hz   duty cycle {args.min_dc}%% (0°) – {args.max_dc}%% (200°)")
     print(f"Sequence    {args.angles}")
     print()
 
