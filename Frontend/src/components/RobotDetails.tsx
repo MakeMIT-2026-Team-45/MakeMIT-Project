@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Robot } from '../types'
 import { useMqtt } from '../hooks/useMqtt'
 
@@ -19,7 +19,7 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
   const { name, minutesAway } = robot
 
   // Live telemetry over MQTT — falls back to static robot data until connected
-  const { telemetry, connected } = useMqtt(robot.id, {
+  const { telemetry } = useMqtt(robot.id, {
     trashCapacity: robot.trashCapacity,
     recycleCapacity: robot.recycleCapacity,
     batteryPercentage: robot.batteryPercentage,
@@ -28,6 +28,22 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
   })
 
   const { trashCapacity, recycleCapacity, batteryPercentage, lat, lng } = telemetry
+
+  // Track whether the video feed is alive (a frame arrived within the last 2s)
+  const [videoLive, setVideoLive] = useState(false)
+  const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleVideoFrame = () => {
+    setVideoLive(true)
+    if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current)
+    videoTimeoutRef.current = setTimeout(() => setVideoLive(false), 2000)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current)
+    }
+  }, [])
 
   return (
     <div
@@ -58,10 +74,10 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
           fontWeight: 600,
           padding: '4px 10px',
           borderRadius: '999px',
-          backgroundColor: connected ? '#D1FAE5' : '#F3F4F6',
-          color: connected ? '#065F46' : '#9BA1B0',
+          backgroundColor: videoLive ? '#D1FAE5' : '#F3F4F6',
+          color: videoLive ? '#065F46' : '#9BA1B0',
         }}>
-          {connected ? 'Live' : 'Offline'}
+          {videoLive ? 'Online' : 'Offline'}
         </span>
       </div>
 
@@ -81,8 +97,23 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
         <img
           src={`http://localhost:8000/video-feed/${robot.id}`}
           alt="Live camera feed"
+          onLoad={handleVideoFrame}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
+        {!videoLive && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#111729',
+          }}>
+            <span style={{ color: '#9BA1B0', fontSize: '14px', fontWeight: 600 }}>
+              Error: No connection
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Map */}
