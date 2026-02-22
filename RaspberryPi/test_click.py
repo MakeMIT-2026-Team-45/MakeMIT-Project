@@ -3,7 +3,7 @@ import time
 import RPi.GPIO as GPIO  # type: ignore
 
 
-PIN = 18  # BCM 18 is physical pin 12.
+PIN = 23  # BCM 18 is physical pin 12.
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(PIN, GPIO.OUT)
