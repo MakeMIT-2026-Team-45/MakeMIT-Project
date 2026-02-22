@@ -30,21 +30,45 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
 
   const { trashCapacity, recycleCapacity, batteryPercentage, lat, lng } = telemetry
 
-  // Track whether the video feed is alive (a frame arrived within the last 2s)
+  // Track whether the video feed is alive
   const [videoLive, setVideoLive] = useState(false)
   const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Latest AI classification result
+  const [aiResult, setAiResult] = useState<{ label: string; confidence: number } | null>(null)
 
   const handleVideoFrame = () => {
     setVideoLive(true)
     if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current)
-    videoTimeoutRef.current = setTimeout(() => setVideoLive(false), 2000)
+    videoTimeoutRef.current = setTimeout(() => setVideoLive(false), 10000)
   }
 
   useEffect(() => {
+    const checkVideo = async () => {
+      try {
+        const res = await fetch(`https://mit.ethanzhao.us/video-frame-check/${robot.id}`)
+        if (res.ok) handleVideoFrame()
+        else setVideoLive(false)
+      } catch {
+        setVideoLive(false)
+      }
+    }
+    const checkAI = async () => {
+      try {
+        const res = await fetch(`https://mit.ethanzhao.us/ai-result/${robot.id}`)
+        if (res.ok) setAiResult(await res.json())
+      } catch { /* ignore */ }
+    }
+    checkVideo()
+    checkAI()
+    const videoInterval = setInterval(checkVideo, 3000)
+    const aiInterval = setInterval(checkAI, 2000)
     return () => {
+      clearInterval(videoInterval)
+      clearInterval(aiInterval)
       if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current)
     }
-  }, [])
+  }, [robot.id])
 
   return (
     <motion.div
@@ -77,11 +101,26 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
         style={{ aspectRatio: '16 / 9' }}
       >
         <img
-          src={`http://localhost:8000/video-feed/${robot.id}`}
+          src={`https://mit.ethanzhao.us/video-feed/${robot.id}?t=${Date.now()}`}
           alt="Live camera feed"
           onLoad={handleVideoFrame}
           className="h-full w-full object-cover"
         />
+        {aiResult && videoLive && (
+          <div style={{
+            position: 'absolute',
+            bottom: 10,
+            left: 10,
+            backgroundColor: aiResult.label === 'recycling' ? '#00C853' : '#FF3D00',
+            color: 'white',
+            fontSize: '13px',
+            fontWeight: 700,
+            padding: '4px 10px',
+            borderRadius: '6px',
+          }}>
+            {aiResult.label.toUpperCase()} — {aiResult.confidence}%
+          </div>
+        )}
         {!videoLive && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#111729]">
             <span className="text-sm font-semibold text-[#9BA1B0]">Error: No connection</span>

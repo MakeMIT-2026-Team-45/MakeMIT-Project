@@ -20,11 +20,14 @@ app = FastAPI()
 _latest_frame: dict[int, bytes] = {}
 _frame_events: dict[int, asyncio.Event] = defaultdict(asyncio.Event)
 
+# --- Latest AI result per robot_id ---
+_latest_ai: dict[int, dict] = {}
+
 # --- MQTT client (publishes Pi telemetry to the broker for the frontend) ---
 mqtt = mqtt_client.Client()
 _mqtt_available = False
 try:
-    mqtt.connect("localhost", 1883)
+    mqtt.connect("localhost", 1880)
     mqtt.loop_start()
     _mqtt_available = True
 except Exception as e:
@@ -100,7 +103,7 @@ async def root():
 
 
 @app.post("/torch-test-video")
-async def torch_test_video(request: Request):
+async def torch_test_video(request: Request, robot_id: int = 1):
     content_type = (request.headers.get("content-type") or "").lower()
     raw = await request.body()
     if not raw:
@@ -127,12 +130,25 @@ async def torch_test_video(request: Request):
     prediction = int(top_idx.item())
     max_probability = float(top_prob.item())
 
+    _latest_ai[robot_id] = {
+        "prediction": prediction,
+        "label": "recycling" if prediction == 1 else "trash",
+        "confidence": round(max_probability * 100),
+    }
+
     return {
         "content_type": content_type,
         "size_bytes": len(raw),
         "prediction": prediction,
         "max_probability": max_probability,
     }
+
+
+@app.get("/ai-result/{robot_id}")
+async def ai_result(robot_id: int):
+    if robot_id not in _latest_ai:
+        raise HTTPException(status_code=404, detail="No AI result available")
+    return _latest_ai[robot_id]
 
 
 # --- MJPEG video pipeline ---
@@ -145,6 +161,13 @@ async def push_frame(robot_id: int, request: Request):
     _latest_frame[robot_id] = raw
     _frame_events[robot_id].set()
     return {"ok": True}
+
+
+@app.get("/video-frame-check/{robot_id}")
+async def video_frame_check(robot_id: int):
+    if robot_id in _latest_frame:
+        return {"ok": True}
+    raise HTTPException(status_code=404, detail="No frame available")
 
 
 @app.get("/video-feed/{robot_id}")

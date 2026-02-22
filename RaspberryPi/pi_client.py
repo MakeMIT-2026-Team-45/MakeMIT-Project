@@ -36,14 +36,14 @@ def parse_args() -> PiClientConfig:
     parser.add_argument(
         "--fps",
         type=float,
-        default=30.0,
+        default=15.0,
         help="Target frames per second for the live video feed.",
     )
     parser.add_argument(
         "--ai-every-n-frames",
         type=int,
-        default=30,
-        help="Run AI inference once every N frames (default: every 30 = ~1/sec at 30fps).",
+        default=15,
+        help="Run AI inference once every N frames (default: every 15 = ~1/sec at 15fps).",
     )
     parser.add_argument(
         "--image-path",
@@ -117,6 +117,8 @@ def post_jpeg(endpoint: str, raw_jpeg: bytes) -> dict:
 
 def _base_url(endpoint: str) -> str:
     from urllib.parse import urlparse
+    if not endpoint.startswith("http://") and not endpoint.startswith("https://"):
+        endpoint = "https://" + endpoint
     p = urlparse(endpoint)
     return f"{p.scheme}://{p.netloc}"
 
@@ -139,6 +141,7 @@ def run(config: PiClientConfig) -> None:
     base_url = _base_url(config.endpoint)
     stream_url = f"{base_url}/video-frame/{config.robot_id}"
     frame_interval = 1.0 / config.fps
+    session = requests.Session()  # reuses TLS connection across frames
 
     print(f"Inference endpoint : {config.endpoint}")
     print(f"Stream push URL    : {stream_url}")
@@ -175,12 +178,14 @@ def run(config: PiClientConfig) -> None:
 
             # Push every frame to the MJPEG stream (non-blocking best-effort)
             try:
-                requests.post(
+                session.post(
                     stream_url,
                     data=frame,
                     headers={"Content-Type": "image/jpeg"},
                     timeout=(2, 2),  # (connect_timeout, read_timeout) in seconds
                 )
+            except requests.exceptions.Timeout:
+                pass  # read timeout is expected on best-effort stream push
             except Exception as exc:
                 print(f"[stream] {exc}")
 
@@ -188,7 +193,7 @@ def run(config: PiClientConfig) -> None:
             if frame_count % config.ai_every_n_frames == 0:
                 threading.Thread(
                     target=_run_ai_inference,
-                    args=(config.endpoint, frame, frame_count),
+                    args=(f"{base_url}/torch-test-video?robot_id={config.robot_id}", frame, frame_count),
                     daemon=True,
                 ).start()
 
