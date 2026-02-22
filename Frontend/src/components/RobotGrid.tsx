@@ -1,4 +1,5 @@
 import type { Robot } from '../types'
+import { motion } from 'framer-motion'
 import RobotCard from './RobotCard'
 
 const robots: Robot[] = [
@@ -16,19 +17,39 @@ interface RobotGridProps {
 
 const RobotGrid = ({ onSelect }: RobotGridProps) => {
   return (
-    <div className="flex flex-col gap-8">
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={{
+        hidden: { opacity: 0 },
+        show: {
+          opacity: 1,
+          transition: {
+            staggerChildren: 0.06,
+          },
+        },
+      }}
+      className="flex flex-col gap-6"
+    >
       {robots.map((robot) => (
-        <RobotCard
+        <motion.div
           key={robot.id}
-          name={robot.name}
-          minutesAway={robot.minutesAway}
-          batteryPercentage={robot.batteryPercentage}
-          trashCapacity={robot.trashCapacity}
-          recycleCapacity={robot.recycleCapacity}
-          onManage={() => onSelect(robot)}
-        />
+          variants={{
+            hidden: { opacity: 0, y: 12 },
+            show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: 'easeOut' } },
+          }}
+        >
+          <RobotCard
+            name={robot.name}
+            minutesAway={robot.minutesAway}
+            batteryPercentage={robot.batteryPercentage}
+            trashCapacity={robot.trashCapacity}
+            recycleCapacity={robot.recycleCapacity}
+            onManage={() => onSelect(robot)}
+          />
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   )
 }
 
