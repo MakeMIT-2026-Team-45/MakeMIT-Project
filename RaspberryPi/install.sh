@@ -25,7 +25,7 @@ then
     echo 'source ~/venv/bin/activate' >> ~/.bashrc
 
     echo "[!] Installing required python packages..."
-    ~/venv/bin/pip install pillow requests python3-rpi-lgpio
+    ~/venv/bin/pip install pillow requests RPi.GPIO
 fi
 
 echo "[!] Testing the camera..."
