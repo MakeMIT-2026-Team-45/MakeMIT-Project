@@ -24,7 +24,7 @@ _frame_events: dict[int, asyncio.Event] = defaultdict(asyncio.Event)
 mqtt = mqtt_client.Client()
 _mqtt_available = False
 try:
-    mqtt.connect("localhost", 1884)
+    mqtt.connect("localhost", 1880)
     mqtt.loop_start()
     _mqtt_available = True
 except Exception as e:
