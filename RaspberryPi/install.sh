@@ -25,11 +25,6 @@ then
 
     echo "[!] Installing required python packages..."
     ~/venv/bin/pip install pillow requests
-
-    echo "[!] Cloning codebase..."
-    cd ~
-    git clone https://github.com/MakeMIT-2026-Team-45/MakeMIT-Project.git
-    cd MakeMIT-Project
 fi
 
 echo "[!] Testing the camera..."
