@@ -95,7 +95,7 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
         justifyContent: 'center',
       }}>
         <img
-          src={`http://localhost:8000/video-feed/${robot.id}`}
+          src={`https://mit.ethanzhao.us/video-feed/${robot.id}`}
           alt="Live camera feed"
           onLoad={handleVideoFrame}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}

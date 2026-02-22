@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 // FastAPI server that handles the WebRTC SDP offer/answer handshake.
 // Replace with your laptop's IP when on the same network.
-const SIGNALING_URL = 'http://localhost:8000/offer'
+const SIGNALING_URL = 'https://mit.ethanzhao.us/offer'
 
 export function useWebRTC(robotId: number) {
   const videoRef = useRef<HTMLVideoElement>(null)

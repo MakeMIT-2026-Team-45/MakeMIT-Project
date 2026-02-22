@@ -141,6 +141,7 @@ def run(config: PiClientConfig) -> None:
     base_url = _base_url(config.endpoint)
     stream_url = f"{base_url}/video-frame/{config.robot_id}"
     frame_interval = 1.0 / config.fps
+    session = requests.Session()  # reuses TLS connection across frames
 
     print(f"Inference endpoint : {config.endpoint}")
     print(f"Stream push URL    : {stream_url}")
@@ -177,7 +178,7 @@ def run(config: PiClientConfig) -> None:
 
             # Push every frame to the MJPEG stream (non-blocking best-effort)
             try:
-                requests.post(
+                session.post(
                     stream_url,
                     data=frame,
                     headers={"Content-Type": "image/jpeg"},
