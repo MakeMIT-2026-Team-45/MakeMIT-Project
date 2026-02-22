@@ -1,14 +1,65 @@
 import io
+import json
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from PIL import Image
 import torch
 from torchvision import transforms
+import paho.mqtt.client as mqtt_client
 
 from train_taco_mobilenet_binary import MobileNetBinaryHead
 
 app = FastAPI()
+
+# --- MQTT client (publishes Pi telemetry to the broker for the frontend) ---
+mqtt = mqtt_client.Client()
+_mqtt_available = False
+try:
+    mqtt.connect("localhost", 1883)
+    mqtt.loop_start()
+    _mqtt_available = True
+except Exception as e:
+    print(f"Warning: Could not connect to MQTT broker — telemetry endpoints will log-only ({e})")
+
+
+class CapacityPayload(BaseModel):
+    trashCapacity: float
+    recycleCapacity: float
+    batteryPercentage: float
+
+
+class LocationPayload(BaseModel):
+    lat: float
+    lng: float
+
+
+# --- Telemetry endpoints (called by the Raspberry Pi) ---
+
+@app.post("/robot/{robot_id}/telemetry/capacity")
+async def post_capacity(robot_id: int, payload: CapacityPayload):
+    if _mqtt_available:
+        mqtt.publish(
+            f"robot/{robot_id}/telemetry/capacity",
+            json.dumps(payload.model_dump()),
+        )
+    else:
+        print(f"[no broker] capacity: {payload.model_dump()}")
+    return {"ok": True}
+
+
+@app.post("/robot/{robot_id}/telemetry/location")
+async def post_location(robot_id: int, payload: LocationPayload):
+    if _mqtt_available:
+        mqtt.publish(
+            f"robot/{robot_id}/telemetry/location",
+            json.dumps(payload.model_dump()),
+        )
+    else:
+        print(f"[no broker] location: {payload.model_dump()}")
+    return {"ok": True}
+
 
 if torch.backends.mps.is_available():
     device = torch.device("mps")
