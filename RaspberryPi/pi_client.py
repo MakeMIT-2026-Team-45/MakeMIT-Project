@@ -117,6 +117,8 @@ def post_jpeg(endpoint: str, raw_jpeg: bytes) -> dict:
 
 def _base_url(endpoint: str) -> str:
     from urllib.parse import urlparse
+    if not endpoint.startswith("http://") and not endpoint.startswith("https://"):
+        endpoint = "https://" + endpoint
     p = urlparse(endpoint)
     return f"{p.scheme}://{p.netloc}"
 
