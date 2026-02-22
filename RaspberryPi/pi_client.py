@@ -13,28 +13,28 @@ from PIL import Image
 # Pickup arm servo
 # ---------------------------------------------------------------------------
 #
-# Physical angle convention (from the diagrams):
-#   0°  = arm pointing straight down / fully lowered  (zero.png)
-#  20°  = resting position, slightly raised            (resting.png)
-#  45°  = maximum raised position for pickup           (maximum.png)
+# Physical angle convention (calibrated via test_servo.py):
+#    0° = arm pointing straight down / fully lowered
+#   60° = resting position, slightly raised
+#  150° = maximum raised position for pickup
 #
-# The servo duty cycle is REVERSED:
-#   min_dc (12.5%) → 0°   (arm down)
-#   max_dc  (2.5%) → 180° (arm fully up, unused)
-# We map only the 0–45° working range within that reversed scale.
+# Servo duty cycle (standard SG90 convention):
+#   min_dc  (2.5%) → 0°   (arm down)
+#   max_dc (12.5%) → 180° (arm fully up, unused)
+# We map only the 0–45° working range within that scale.
 #
 # BCM GPIO pin: 12  (physical pin 32, hardware PWM channel 0)
 # Servo signal wired to this pin; VCC → external 5V; GND → common GND.
 
 PICKUP_SERVO_PIN   = 12
 PICKUP_FREQ_HZ     = 50.0
-PICKUP_MIN_DC      = 12.5   # duty cycle at 0°  (arm down)
-PICKUP_MAX_DC      = 2.5    # duty cycle at 180° (arm fully up)
+PICKUP_MIN_DC      = 2.5    # duty cycle at 0°  (arm down)
+PICKUP_MAX_DC      = 12.5   # duty cycle at 180° (arm fully up)
 PICKUP_MAX_DEG     = 180.0  # full servo range used for DC mapping
 
-ANGLE_ZERO    =  0.0   # arm fully lowered
-ANGLE_REST    = 20.0   # resting position
-ANGLE_MAX     = 45.0   # maximum pickup height
+ANGLE_ZERO    =   0.0   # arm fully lowered
+ANGLE_REST    =  60.0   # resting position
+ANGLE_MAX     = 150.0   # maximum pickup height
 
 PICKUP_CONFIDENCE_THRESHOLD = 0.70   # trigger when recycling prob > 70%
 
