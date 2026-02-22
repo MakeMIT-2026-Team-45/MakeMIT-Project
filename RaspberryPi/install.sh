@@ -16,7 +16,8 @@ then
         ffmpeg \
         git \
         curl \
-        wget
+        wget \
+
 
     echo "[!] Activating virtual environment..."
     python3 -m venv ~/venv --system-site-packages
@@ -24,7 +25,7 @@ then
     echo 'source ~/venv/bin/activate' >> ~/.bashrc
 
     echo "[!] Installing required python packages..."
-    ~/venv/bin/pip install pillow requests
+    ~/venv/bin/pip install pillow requests python3-rpi.gpio
 fi
 
 echo "[!] Testing the camera..."
