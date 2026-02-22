@@ -101,7 +101,7 @@ def _measure_ultrasonic_distance_cm(trigger_pin: int, echo_pin: int) -> float | 
     except ImportError:
         raise RuntimeError("RPi.GPIO is not installed. Run this on a Raspberry Pi.")
 
-    pulse_timeout_sec = 0.03
+    pulse_timeout_sec = 0.05
     speed_of_sound_cm_per_sec = 34300.0
 
     GPIO.setmode(GPIO.BCM)
@@ -118,11 +118,11 @@ def _measure_ultrasonic_distance_cm(trigger_pin: int, echo_pin: int) -> float | 
             # Always force output mode before emitting a trigger pulse.
             GPIO.setup(trigger_pin, GPIO.OUT)
             GPIO.output(trigger_pin, False)
-            time.sleep(0.01)
+            time.sleep(0.2)
 
             # Send trigger pulse on the shared signal pin, then switch to input.
             GPIO.output(trigger_pin, True)
-            time.sleep(0.00001)
+            time.sleep(0.000015)
             GPIO.output(trigger_pin, False)
             GPIO.setup(trigger_pin, GPIO.IN)
 
@@ -140,11 +140,11 @@ def _measure_ultrasonic_distance_cm(trigger_pin: int, echo_pin: int) -> float | 
             # Always force output mode before emitting a trigger pulse.
             GPIO.setup(trigger_pin, GPIO.OUT)
             GPIO.output(trigger_pin, False)
-            time.sleep(0.01)
+            time.sleep(0.2)
 
-            # Send a 10us trigger pulse.
+            # Send a robust trigger pulse.
             GPIO.output(trigger_pin, True)
-            time.sleep(0.00001)
+            time.sleep(0.000015)
             GPIO.output(trigger_pin, False)
 
             wait_start = time.perf_counter()
@@ -161,7 +161,10 @@ def _measure_ultrasonic_distance_cm(trigger_pin: int, echo_pin: int) -> float | 
         pulse_duration = pulse_end - pulse_start
         return (pulse_duration * speed_of_sound_cm_per_sec) / 2.0
     finally:
-        GPIO.cleanup((trigger_pin, echo_pin))
+        if one_wire_mode:
+            GPIO.cleanup(trigger_pin)
+        else:
+            GPIO.cleanup((trigger_pin, echo_pin))
 
 
 def sonar_is_alive(trigger_pin: int, echo_pin: int, attempts: int = 3) -> bool:
