@@ -4,6 +4,9 @@ test_servo.py — Standalone servo wiring test.
 Sweeps the servo through 0° → 90° → 180° → 90° → 0° so you can visually
 confirm the servo is wired correctly before running the full drive_client.
 
+Direction is reversed (min_dc=12.5, max_dc=2.5) so 0° physically moves CW
+and 180° moves CCW, opposite of the standard SG90 convention.
+
 Wiring (SG90 / MG996R):
   Signal → Pin 32 (BCM GPIO 12, hardware PWM channel 0)
   VCC    → external 5V (NOT the Pi's 3.3V or 5V pin — servo draws too much)
@@ -33,10 +36,10 @@ def main() -> None:
                         help="BCM GPIO pin for servo signal (default: 12, physical pin 32).")
     parser.add_argument("--freq", type=float, default=50.0,
                         help="PWM frequency in Hz (default: 50).")
-    parser.add_argument("--min-dc", type=float, default=2.5,
-                        help="Duty cycle for 0° (SG90 default: 2.5%%).")
-    parser.add_argument("--max-dc", type=float, default=12.5,
-                        help="Duty cycle for 180° (SG90 default: 12.5%%).")
+    parser.add_argument("--min-dc", type=float, default=12.5,
+                        help="Duty cycle for 0° (reversed: 12.5%% = CW start).")
+    parser.add_argument("--max-dc", type=float, default=2.5,
+                        help="Duty cycle for 180° (reversed: 2.5%% = CCW end).")
     parser.add_argument("--settle", type=float, default=0.6,
                         help="Seconds to wait after each move (default: 0.6).")
     parser.add_argument("--angles", type=float, nargs="+", default=[0, 90, 180, 90, 0],
