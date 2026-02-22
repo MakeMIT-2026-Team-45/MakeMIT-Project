@@ -105,28 +105,58 @@ def _measure_ultrasonic_distance_cm(trigger_pin: int, echo_pin: int) -> float | 
     speed_of_sound_cm_per_sec = 34300.0
 
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(trigger_pin, GPIO.OUT)
-    GPIO.setup(echo_pin, GPIO.IN)
+    one_wire_mode = trigger_pin == echo_pin
+    if one_wire_mode:
+        # One-wire sonar: the same GPIO line is used for trigger and echo.
+        GPIO.setup(trigger_pin, GPIO.OUT)
+    else:
+        GPIO.setup(trigger_pin, GPIO.OUT)
+        GPIO.setup(echo_pin, GPIO.IN)
 
     try:
-        GPIO.output(trigger_pin, False)
-        time.sleep(0.05)
+        if one_wire_mode:
+            # Always force output mode before emitting a trigger pulse.
+            GPIO.setup(trigger_pin, GPIO.OUT)
+            GPIO.output(trigger_pin, False)
+            time.sleep(0.01)
 
-        # Send a 10us trigger pulse.
-        GPIO.output(trigger_pin, True)
-        time.sleep(0.00001)
-        GPIO.output(trigger_pin, False)
+            # Send trigger pulse on the shared signal pin, then switch to input.
+            GPIO.output(trigger_pin, True)
+            time.sleep(0.00001)
+            GPIO.output(trigger_pin, False)
+            GPIO.setup(trigger_pin, GPIO.IN)
 
-        wait_start = time.perf_counter()
-        while GPIO.input(echo_pin) == 0:
-            if time.perf_counter() - wait_start > pulse_timeout_sec:
-                return None
-        pulse_start = time.perf_counter()
+            wait_start = time.perf_counter()
+            while GPIO.input(trigger_pin) == 0:
+                if time.perf_counter() - wait_start > pulse_timeout_sec:
+                    return None
+            pulse_start = time.perf_counter()
 
-        while GPIO.input(echo_pin) == 1:
-            if time.perf_counter() - pulse_start > pulse_timeout_sec:
-                return None
-        pulse_end = time.perf_counter()
+            while GPIO.input(trigger_pin) == 1:
+                if time.perf_counter() - pulse_start > pulse_timeout_sec:
+                    return None
+            pulse_end = time.perf_counter()
+        else:
+            # Always force output mode before emitting a trigger pulse.
+            GPIO.setup(trigger_pin, GPIO.OUT)
+            GPIO.output(trigger_pin, False)
+            time.sleep(0.01)
+
+            # Send a 10us trigger pulse.
+            GPIO.output(trigger_pin, True)
+            time.sleep(0.00001)
+            GPIO.output(trigger_pin, False)
+
+            wait_start = time.perf_counter()
+            while GPIO.input(echo_pin) == 0:
+                if time.perf_counter() - wait_start > pulse_timeout_sec:
+                    return None
+            pulse_start = time.perf_counter()
+
+            while GPIO.input(echo_pin) == 1:
+                if time.perf_counter() - pulse_start > pulse_timeout_sec:
+                    return None
+            pulse_end = time.perf_counter()
 
         pulse_duration = pulse_end - pulse_start
         return (pulse_duration * speed_of_sound_cm_per_sec) / 2.0
