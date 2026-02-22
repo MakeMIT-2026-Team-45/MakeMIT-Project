@@ -147,6 +147,13 @@ async def push_frame(robot_id: int, request: Request):
     return {"ok": True}
 
 
+@app.get("/video-frame-check/{robot_id}")
+async def video_frame_check(robot_id: int):
+    if robot_id in _latest_frame:
+        return {"ok": True}
+    raise HTTPException(status_code=404, detail="No frame available")
+
+
 @app.get("/video-feed/{robot_id}")
 async def video_feed(robot_id: int):
     async def generate():

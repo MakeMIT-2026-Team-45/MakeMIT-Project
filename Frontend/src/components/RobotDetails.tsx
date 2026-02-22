@@ -29,21 +29,34 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
 
   const { trashCapacity, recycleCapacity, batteryPercentage, lat, lng } = telemetry
 
-  // Track whether the video feed is alive (a frame arrived within the last 2s)
+  // Track whether the video feed is alive
   const [videoLive, setVideoLive] = useState(false)
   const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleVideoFrame = () => {
     setVideoLive(true)
     if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current)
-    videoTimeoutRef.current = setTimeout(() => setVideoLive(false), 2000)
+    videoTimeoutRef.current = setTimeout(() => setVideoLive(false), 5000)
   }
 
   useEffect(() => {
+    // Poll backend every 3s — if the stream endpoint has a live frame stored, it returns 200 immediately
+    const check = async () => {
+      try {
+        const res = await fetch(`https://mit.ethanzhao.us/video-frame-check/${robot.id}`)
+        if (res.ok) handleVideoFrame()
+        else setVideoLive(false)
+      } catch {
+        setVideoLive(false)
+      }
+    }
+    check()
+    const interval = setInterval(check, 3000)
     return () => {
+      clearInterval(interval)
       if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current)
     }
-  }, [])
+  }, [robot.id])
 
   return (
     <div
