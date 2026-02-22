@@ -1,8 +1,11 @@
+import asyncio
 import io
 import json
+from collections import defaultdict
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from PIL import Image
 import torch
@@ -12,6 +15,10 @@ import paho.mqtt.client as mqtt_client
 from train_taco_mobilenet_binary import MobileNetBinaryHead
 
 app = FastAPI()
+
+# --- MJPEG frame store (one latest frame per robot_id) ---
+_latest_frame: dict[int, bytes] = {}
+_frame_events: dict[int, asyncio.Event] = defaultdict(asyncio.Event)
 
 # --- MQTT client (publishes Pi telemetry to the broker for the frontend) ---
 mqtt = mqtt_client.Client()
@@ -126,3 +133,32 @@ async def torch_test_video(request: Request):
         "prediction": prediction,
         "max_probability": max_probability,
     }
+
+
+# --- MJPEG video pipeline ---
+
+@app.post("/video-frame/{robot_id}")
+async def push_frame(robot_id: int, request: Request):
+    raw = await request.body()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty body")
+    _latest_frame[robot_id] = raw
+    _frame_events[robot_id].set()
+    return {"ok": True}
+
+
+@app.get("/video-feed/{robot_id}")
+async def video_feed(robot_id: int):
+    async def generate():
+        while True:
+            event = _frame_events[robot_id]
+            await event.wait()
+            event.clear()
+            frame = _latest_frame.get(robot_id)
+            if frame:
+                yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )

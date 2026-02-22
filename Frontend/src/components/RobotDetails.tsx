@@ -2,8 +2,6 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import { useEffect } from 'react'
 import type { Robot } from '../types'
 import { useMqtt } from '../hooks/useMqtt'
-import { useWebRTC } from '../hooks/useWebRTC'
-
 
 interface RobotDetailsProps {
   robot: Robot
@@ -30,9 +28,6 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
   })
 
   const { trashCapacity, recycleCapacity, batteryPercentage, lat, lng } = telemetry
-
-  // Live video over WebRTC
-  const { videoRef, error: videoError } = useWebRTC(robot.id)
 
   return (
     <div
@@ -83,18 +78,11 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
         alignItems: 'center',
         justifyContent: 'center',
       }}>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: videoError ? 'none' : 'block' }}
+        <img
+          src={`http://localhost:8000/video-feed/${robot.id}`}
+          alt="Live camera feed"
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
-        {videoError && (
-          <span style={{ color: '#9BA1B0', fontSize: '13px' }}>
-            Video unavailable — waiting for WebRTC connection
-          </span>
-        )}
       </div>
 
       {/* Map */}
