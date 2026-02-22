@@ -1,5 +1,6 @@
 import argparse
 import io
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,7 +13,8 @@ from PIL import Image
 @dataclass
 class PiClientConfig:
     endpoint: str
-    interval_sec: float
+    fps: float
+    ai_every_n_frames: int
     image_path: Optional[Path]
     one_shot: bool
     robot_id: int
@@ -32,10 +34,16 @@ def parse_args() -> PiClientConfig:
         help="Backend endpoint URL.",
     )
     parser.add_argument(
-        "--interval-sec",
+        "--fps",
         type=float,
-        default=1.0,
-        help="Time between frame uploads in loop mode.",
+        default=30.0,
+        help="Target frames per second for the live video feed.",
+    )
+    parser.add_argument(
+        "--ai-every-n-frames",
+        type=int,
+        default=30,
+        help="Run AI inference once every N frames (default: every 30 = ~1/sec at 30fps).",
     )
     parser.add_argument(
         "--image-path",
@@ -60,7 +68,8 @@ def parse_args() -> PiClientConfig:
     args = parser.parse_args()
     return PiClientConfig(
         endpoint=args.endpoint,
-        interval_sec=args.interval_sec,
+        fps=args.fps,
+        ai_every_n_frames=args.ai_every_n_frames,
         image_path=args.image_path,
         one_shot=args.one_shot,
         robot_id=args.robot_id,
@@ -72,27 +81,27 @@ def jpeg_bytes_from_path(image_path: Path) -> bytes:
         raise FileNotFoundError(f"Image not found: {image_path}")
     img = Image.open(image_path).convert("RGB")
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=92)
+    img.save(buf, format="JPEG", quality=85)
     return buf.getvalue()
 
 
-def jpeg_bytes_from_picamera2() -> bytes:
+def open_picamera2():
     from picamera2 import Picamera2  # type: ignore
 
     picam = Picamera2()
-    try:
-        config = picam.create_still_configuration()
-        picam.configure(config)
-        picam.start()
-        time.sleep(0.3)
-        frame = picam.capture_array("main")
-        img = Image.fromarray(frame).convert("RGB")
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=92)
-        return buf.getvalue()
-    finally:
-        picam.stop()
-        picam.close()
+    config = picam.create_video_configuration(main={"size": (640, 480)})
+    picam.configure(config)
+    picam.start()
+    time.sleep(0.5)  # let AEC/AWB settle once at startup
+    return picam
+
+
+def capture_jpeg_from_picamera2(picam) -> bytes:
+    frame = picam.capture_array("main")
+    img = Image.fromarray(frame).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    return buf.getvalue()
 
 
 def post_jpeg(endpoint: str, raw_jpeg: bytes) -> dict:
@@ -106,64 +115,95 @@ def post_jpeg(endpoint: str, raw_jpeg: bytes) -> dict:
     return resp.json()
 
 
-def get_frame_bytes(image_path: Optional[Path]) -> bytes:
-    if image_path is not None:
-        return jpeg_bytes_from_path(image_path)
-    return jpeg_bytes_from_picamera2()
-
-
 def _base_url(endpoint: str) -> str:
     from urllib.parse import urlparse
     p = urlparse(endpoint)
     return f"{p.scheme}://{p.netloc}"
 
 
+def _run_ai_inference(endpoint: str, frame: bytes, frame_count: int) -> None:
+    """Runs in a background thread so it never blocks the video loop."""
+    try:
+        result = post_jpeg(endpoint, frame)
+        cls = result.get("prediction")
+        prob = result.get("max_probability")
+        label = "recycling" if cls == 1 else "trash"
+        print(f"[frame {frame_count}] {label} ({prob:.1%}) bytes={len(frame)}")
+    except requests.HTTPError as exc:
+        print(f"[AI] HTTP error {exc.response.status_code}: {exc.response.text}")
+    except Exception as exc:
+        print(f"[AI] error: {exc}")
+
+
 def run(config: PiClientConfig) -> None:
     base_url = _base_url(config.endpoint)
     stream_url = f"{base_url}/video-frame/{config.robot_id}"
+    frame_interval = 1.0 / config.fps
+
     print(f"Inference endpoint : {config.endpoint}")
     print(f"Stream push URL    : {stream_url}")
+    print(f"Target FPS         : {config.fps}")
+    print(f"AI every N frames  : {config.ai_every_n_frames}")
     print("Press Ctrl+C to stop.\n")
 
-    frame_count = 0
-    while True:
+    picam = None
+    if config.image_path is None:
         try:
-            frame = get_frame_bytes(config.image_path)
-            frame_count += 1
-
-            # Always push frame to the MJPEG stream
-            requests.post(
-                stream_url,
-                data=frame,
-                headers={"Content-Type": "image/jpeg"},
-                timeout=5,
-            )
-
-            # Run AI inference every 10th frame
-            if frame_count % 10 == 0:
-                result = post_jpeg(config.endpoint, frame)
-                cls = result.get("prediction")
-                prob = result.get("max_probability")
-                label = "recycling" if cls == 1 else "trash"
-                print(f"[frame {frame_count}] {label} ({prob:.1%}) bytes={len(frame)}")
-
+            picam = open_picamera2()
         except ImportError:
             print(
                 "picamera2 is not installed. Install it on Raspberry Pi or pass "
                 "--image-path /path/to/sample.jpg"
             )
-            break
-        except FileNotFoundError as exc:
-            print(exc)
-            break
-        except requests.HTTPError as exc:
-            print(f"HTTP error {exc.response.status_code}: {exc.response.text}")
-        except Exception as exc:
-            print(f"Unexpected error: {exc}")
+            return
 
-        if config.one_shot:
-            break
-        time.sleep(config.interval_sec)
+    frame_count = 0
+    try:
+        while True:
+            t_start = time.monotonic()
+
+            try:
+                if config.image_path is not None:
+                    frame = jpeg_bytes_from_path(config.image_path)
+                else:
+                    frame = capture_jpeg_from_picamera2(picam)
+            except FileNotFoundError as exc:
+                print(exc)
+                break
+
+            frame_count += 1
+
+            # Push every frame to the MJPEG stream (non-blocking best-effort)
+            try:
+                requests.post(
+                    stream_url,
+                    data=frame,
+                    headers={"Content-Type": "image/jpeg"},
+                    timeout=frame_interval,  # don't stall longer than one frame period
+                )
+            except Exception as exc:
+                print(f"[stream] {exc}")
+
+            # Fire AI inference in a background thread — never blocks the video loop
+            if frame_count % config.ai_every_n_frames == 0:
+                threading.Thread(
+                    target=_run_ai_inference,
+                    args=(config.endpoint, frame, frame_count),
+                    daemon=True,
+                ).start()
+
+            if config.one_shot:
+                break
+
+            # Sleep only the remaining time in this frame period
+            elapsed = time.monotonic() - t_start
+            sleep_time = frame_interval - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+    finally:
+        if picam is not None:
+            picam.stop()
+            picam.close()
 
 
 if __name__ == "__main__":
