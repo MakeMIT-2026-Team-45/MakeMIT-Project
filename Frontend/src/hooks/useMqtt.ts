@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import mqtt from 'mqtt'
 
-// Connects to Mosquitto broker over WebSockets (port 8080).
+// Connects to Mosquitto broker over WebSockets (port 8000).
 // Replace with your laptop's IP when on the same network.
-const BROKER_URL = 'ws://localhost:8080'
+const BROKER_URL = 'ws://localhost:8000'
 
 export interface Telemetry {
   trashCapacity: number

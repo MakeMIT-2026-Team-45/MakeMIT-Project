@@ -98,7 +98,7 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
       </div>
 
       {/* Map */}
-      <div style={{ borderRadius: '12px', overflow: 'hidden', height: '200px', flexShrink: 0 }}>
+      <div style={{ borderRadius: '12px', overflow: 'hidden', height: '150px', flexShrink: 0 }}>
         <MapContainer center={[lat, lng]} zoom={18} style={{ height: '100%', width: '100%' }} key={robot.id} zoomControl={false}>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <MapRecenter lat={lat} lng={lng} />
