@@ -39,7 +39,7 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
   const handleVideoFrame = () => {
     setVideoLive(true)
     if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current)
-    videoTimeoutRef.current = setTimeout(() => setVideoLive(false), 5000)
+    videoTimeoutRef.current = setTimeout(() => setVideoLive(false), 10000)
   }
 
   useEffect(() => {

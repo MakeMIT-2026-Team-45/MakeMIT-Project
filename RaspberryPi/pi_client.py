@@ -42,8 +42,8 @@ def parse_args() -> PiClientConfig:
     parser.add_argument(
         "--ai-every-n-frames",
         type=int,
-        default=30,
-        help="Run AI inference once every N frames (default: every 30 = ~1/sec at 30fps).",
+        default=15,
+        help="Run AI inference once every N frames (default: every 15 = ~1/sec at 15fps).",
     )
     parser.add_argument(
         "--image-path",
