@@ -36,7 +36,7 @@ def parse_args() -> PiClientConfig:
     parser.add_argument(
         "--fps",
         type=float,
-        default=30.0,
+        default=20.0,
         help="Target frames per second for the live video feed.",
     )
     parser.add_argument(
@@ -183,6 +183,8 @@ def run(config: PiClientConfig) -> None:
                     headers={"Content-Type": "image/jpeg"},
                     timeout=(2, 2),  # (connect_timeout, read_timeout) in seconds
                 )
+            except requests.exceptions.Timeout:
+                pass  # read timeout is expected on best-effort stream push
             except Exception as exc:
                 print(f"[stream] {exc}")
 
