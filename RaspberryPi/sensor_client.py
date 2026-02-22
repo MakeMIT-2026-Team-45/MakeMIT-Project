@@ -96,75 +96,44 @@ def _measure_ultrasonic_distance_cm(trigger_pin: int, echo_pin: int) -> float | 
     """
     Return measured distance in cm, or None if no echo was detected in time.
     """
+    # One-wire Grove sonar uses a single signal GPIO for both trigger and echo.
+    pin = trigger_pin
+
     try:
         import RPi.GPIO as GPIO  # type: ignore
     except ImportError:
-        raise RuntimeError("RPi.GPIO is not installed. Run this on a Raspberry Pi.")
+        raise RuntimeError("RPi.GPIO is not installed.")
 
-    pulse_timeout_sec = 0.05
+    pulse_timeout_sec = 0.03
     speed_of_sound_cm_per_sec = 34300.0
 
     GPIO.setmode(GPIO.BCM)
-    one_wire_mode = trigger_pin == echo_pin
-    if one_wire_mode:
-        # One-wire sonar: the same GPIO line is used for trigger and echo.
-        GPIO.setup(trigger_pin, GPIO.OUT)
-    else:
-        GPIO.setup(trigger_pin, GPIO.OUT)
-        GPIO.setup(echo_pin, GPIO.IN)
 
     try:
-        if one_wire_mode:
-            # Always force output mode before emitting a trigger pulse.
-            GPIO.setup(trigger_pin, GPIO.OUT)
-            GPIO.output(trigger_pin, False)
-            time.sleep(0.2)
+        GPIO.setup(pin, GPIO.OUT)
+        GPIO.output(pin, False)
+        time.sleep(0.1)
 
-            # Send trigger pulse on the shared signal pin, then switch to input.
-            GPIO.output(trigger_pin, True)
-            time.sleep(0.000015)
-            GPIO.output(trigger_pin, False)
-            GPIO.setup(trigger_pin, GPIO.IN)
+        GPIO.output(pin, True)
+        time.sleep(0.00001)
+        GPIO.output(pin, False)
 
-            wait_start = time.perf_counter()
-            while GPIO.input(trigger_pin) == 0:
-                if time.perf_counter() - wait_start > pulse_timeout_sec:
-                    return None
-            pulse_start = time.perf_counter()
+        GPIO.setup(pin, GPIO.IN)
 
-            while GPIO.input(trigger_pin) == 1:
-                if time.perf_counter() - pulse_start > pulse_timeout_sec:
-                    return None
-            pulse_end = time.perf_counter()
-        else:
-            # Always force output mode before emitting a trigger pulse.
-            GPIO.setup(trigger_pin, GPIO.OUT)
-            GPIO.output(trigger_pin, False)
-            time.sleep(0.2)
+        wait_start = time.perf_counter()
+        while GPIO.input(pin) == 0:
+            if time.perf_counter() - wait_start > pulse_timeout_sec:
+                return None
+        pulse_start = time.perf_counter()
 
-            # Send a robust trigger pulse.
-            GPIO.output(trigger_pin, True)
-            time.sleep(0.000015)
-            GPIO.output(trigger_pin, False)
+        while GPIO.input(pin) == 1:
+            if time.perf_counter() - pulse_start > pulse_timeout_sec:
+                return None
+        pulse_end = time.perf_counter()
 
-            wait_start = time.perf_counter()
-            while GPIO.input(echo_pin) == 0:
-                if time.perf_counter() - wait_start > pulse_timeout_sec:
-                    return None
-            pulse_start = time.perf_counter()
-
-            while GPIO.input(echo_pin) == 1:
-                if time.perf_counter() - pulse_start > pulse_timeout_sec:
-                    return None
-            pulse_end = time.perf_counter()
-
-        pulse_duration = pulse_end - pulse_start
-        return (pulse_duration * speed_of_sound_cm_per_sec) / 2.0
+        return ((pulse_end - pulse_start) * speed_of_sound_cm_per_sec) / 2.0
     finally:
-        if one_wire_mode:
-            GPIO.cleanup(trigger_pin)
-        else:
-            GPIO.cleanup((trigger_pin, echo_pin))
+        GPIO.cleanup(pin)
 
 
 def sonar_is_alive(trigger_pin: int, echo_pin: int, attempts: int = 3) -> bool:
