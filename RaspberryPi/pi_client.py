@@ -36,7 +36,7 @@ def parse_args() -> PiClientConfig:
     parser.add_argument(
         "--fps",
         type=float,
-        default=20.0,
+        default=15.0,
         help="Target frames per second for the live video feed.",
     )
     parser.add_argument(

@@ -108,9 +108,16 @@ const RobotDetails = ({ robot }: RobotDetailsProps) => {
         justifyContent: 'center',
       }}>
         <img
-          src={`https://mit.ethanzhao.us/video-feed/${robot.id}`}
+          src={`https://mit.ethanzhao.us/video-feed/${robot.id}?t=${Date.now()}`}
           alt="Live camera feed"
           onLoad={handleVideoFrame}
+          onError={(e) => {
+            // Reconnect after 2s on error/stream drop
+            setTimeout(() => {
+              const img = e.currentTarget
+              img.src = `https://mit.ethanzhao.us/video-feed/${robot.id}?t=${Date.now()}`
+            }, 2000)
+          }}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
         {!videoLive && (
