@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "[start.sh] Starting Mosquitto..."
-mosquitto -c /etc/mosquitto/mosquitto.conf &
+mosquitto -c /etc/mosquitto/mosquitto.conf 2>&1 &
 
 echo "[start.sh] Waiting for Mosquitto on port 1883..."
 for i in $(seq 1 20); do
