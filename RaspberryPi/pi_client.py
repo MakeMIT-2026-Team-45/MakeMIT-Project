@@ -34,7 +34,7 @@ PICKUP_MAX_DEG     = 180.0  # full servo range used for DC mapping
 
 ANGLE_ZERO    =   0.0   # arm fully lowered
 ANGLE_REST    =  60.0   # resting position
-ANGLE_MAX     = 150.0   # maximum pickup height
+ANGLE_MAX     = 170.0   # maximum pickup height
 
 PICKUP_CONFIDENCE_THRESHOLD = 0.70   # trigger when recycling prob > 70%
 
